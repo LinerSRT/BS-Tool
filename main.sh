@@ -1,10 +1,8 @@
 #!/bin/bash
+export curdate=`date "+_%H:%M"`
 #Variables
 OUT_DIR="out"
 source initialization.bsf
-download_packer(){
-	echo "download" #EDIT THISSS!!!!! 
-}
 config_script(){
 if [ ! -f initialization.bsf ]
   then
@@ -50,12 +48,12 @@ if [ ! -f initialization.bsf ]
 	fi
 	echo "KERN_IMG='$KERN_IMG'" >> initialization.bsf
 	echo "KERN_FOLDER='$OUT_DIR/kernel'" >> initialization.bsf
+	mkdir $OUT_DIR/logs
 	
 	#Configuring script
 	if(whiptail --title  "BS Tool" --yesno  "Download BS Tool recommended cross-compile tool?" 10 60)
 	then
 		echo "USE_OTHER_CROSS_COMPILER='yes'" >> initialization.bsf
-		echo "download" #EDIT THISSS!!!!!
 	else
 		echo "USE_OTHER_CROSS_COMPILER='no'" >> initialization.bsf
 	fi
@@ -63,10 +61,6 @@ if [ ! -f initialization.bsf ]
 	if(whiptail --title  "BS Tool" --yesno  "Use BS Boot-packer?" 10 60)
 	then
 		echo "USE_BOOT_PACK='yes'" >> initialization.bsf
-		download_packer(){
-			echo "download" #EDIT THISSS!!!!! 
-		}
-		download_packer
 	else
 		echo "USE_BOOT_PACK='no'" >> initialization.bsf
 	fi
@@ -77,7 +71,29 @@ if [ ! -f initialization.bsf ]
 	else
 		echo "PACK_IMG_AFTER_BUILD='no'" >> initialization.bsf
 	fi
+
+	if(whiptail --title  "BS Tool" --yesno  "Open kernel.log after fail compilation?" 10 60)
+	then
+		echo "FAIL_LOG='yes'" >> initialization.bsf
+	else
+		echo "FAIL_LOG='no'" >> initialization.bsf
+	fi
+
+	if(whiptail --title  "BS Tool" --yesno  "Download packages for compiling?" 10 60)
+	then
+		echo "ADD_PKG='yes'" >> initialization.bsf
+	else
+		echo "ADD_PKG='no'" >> initialization.bsf
+	fi
+
+	if(whiptail --title  "BS Tool" --yesno  "Store debuging logs in $OUT_DIR folder (logcat, dmesg and etc.)?" 10 60)
+	then
+		echo "STORE_LOG_DB='yes'" >> initialization.bsf
+	else
+		echo "STORE_LOG_DB='no'" >> initialization.bsf
+	fi
  fi
+main_menu
 }
 {
     for ((i = 0 ; i <= 100 ; i+=20)); do
@@ -85,32 +101,145 @@ if [ ! -f initialization.bsf ]
         echo $i
     done
 } | whiptail --gauge "Loading..." 6 60 0
+#-----------------------Functions---------------------------------------
+get_logcat(){
+	read LOGCAT < <(adb logcat)
+	cd $OUT_DIR/logs
+	echo $LOGCAT >> logcat-$curdate.txt
+	 cd .. && cd ..
+	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
+}
+get_dmesg(){
+	read DMESG < <(adb shell su -c dmesg)
+	cd $OUT_DIR/logs
+	echo $DMESG >> dmesg-$curdate.txt
+	 cd .. && cd ..
+	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
+}
+get_kmsg(){
+	read KMSG < <(adb shell su -c cat proc/kmsg)
+	cd $OUT_DIR/logs
+	echo $KMSG >> kmsg-$curdate.txt
+	 cd .. && cd ..
+	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
+}
+get_device_info(){
+	whiptail --title "BS Tool" --msgbox "Power on the phone and turn on debug mode in developer settings!" 10 60
+	sleep 0.3s
+	read CPU_PHONE < <(adb shell cat proc/cpuinfo | grep -o "MT[0-9][0-9][0-9][0-9]")
+	read RAM_PHONE_KB < <(adb shell cat proc/meminfo | grep MemTotal | grep -o "[0-9]*")
+	read KERN_VER_PHONE < <(adb shell cat proc/version | grep -o "3\.[0-9]*\.[0-9]*")
+	echo "CPU_PHONE='$CPU_PHONE'" >> initialization.bsf
+	echo "RAM_PHONE_KB='$RAM_PHONE_KB'" >> initialization.bsf
+	echo "KERN_VER_PHONE='$KERN_VER_PHONE'" >> initialization.bsf
+}
+#-----------------------MENU Construct----------------------------------
 
-settigs_menu(){
-SETTINGS_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
-"1" "Show device info" \
-"2" "Download BS Boot-packer add-on " \
-"3" "Re-config script" \
+log_menu(){
+LOG_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
+"1" "Get logcat" \
+"2" "Get dmesg" \
+"3" "Get kmsg or lastkmsg" \
 "4" "Back"  3>&1 1>&2 2>&3)
-if [ $SETTINGS_MENU -eq "4" ]
+
+if [ $LOG_MENU -eq "4" ]
 	then
-	main_menu
+	debug_menu
 fi
-if [ $SETTINGS_MENU -eq "3" ]
+if [ $LOG_MENU -eq "1" ]
 	then
-	rm -rf initialization.bsf
-	rm -rf $OUT_DIR/kernel
-	config_script
+	get_logcat
 fi
-if [ $SETTINGS_MENU -eq "2" ]
+if [ $LOG_MENU -eq "2" ]
 	then
-	download_packer
+	get_dmesg
 fi
-if [ $SETTINGS_MENU -eq "1" ]
+if [ $LOG_MENU -eq "3" ]
 	then
-	whiptail --title "BS Tool" --msgbox "Kernel version: $KRN_VER
-Device platform: testing" 10 60
-	main_menu
+	get_kmsg
+fi
+}
+
+reboot_menu(){
+REBOOT_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
+"1" "Reboot to fastboot" \
+"2" "Reboot to recovery" \
+"3" "Reboot to system" \
+"4" "Back"  3>&1 1>&2 2>&3)
+
+if [ $REBOOT_MENU -eq "4" ]
+	then
+	debug_menu
+fi
+if [ $REBOOT_MENU -eq "1" ]
+	then
+	adb reboot fastboot
+	sleep 1s
+fi
+if [ $REBOOT_MENU -eq "2" ]
+	then
+	adb reboot recovery
+	sleep 1s
+fi
+if [ $REBOOT_MENU -eq "3" ]
+	then
+	adb reboot
+	sleep 1s
+fi
+}
+
+debug_menu(){
+DEBUG_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
+"1" "Get log's" \
+"2" "Get device info" \
+"3" "Reboot menu" \
+"4" "Back"  3>&1 1>&2 2>&3)
+
+if [ $DEBUG_MENU -eq "4" ]
+	then
+	main_finctions
+fi
+if [ $DEBUG_MENU -eq "1" ]
+	then
+	log_menu
+fi
+if [ $DEBUG_MENU -eq "2" ]
+	then
+	get_device_info
+	debug_menu
+fi
+}
+
+compile_menu(){
+COMPILE_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
+"1" "Compile new kernel" \
+"2" "Re-compile kernel" \
+"3" "Clean out directory" \
+"4" "Back"  3>&1 1>&2 2>&3)
+
+if [ $COMPILE_MENU -eq "4" ]
+	then
+	main_finctions
+fi
+if [ $COMPILE_MENU -eq "4" ]
+	then
+	main_finctions
+fi
+}
+
+flash_menu(){
+FLASH_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
+"1" "Flash boot/recovery from fastboot" \
+"2" "Flash boot/recovery from recovery (BETA)" \
+"3" "Back"  3>&1 1>&2 2>&3)
+
+if [ $FLASH_MENU -eq "3" ]
+	then
+	main_finctions
+fi
+if [ $FLASH_MENU -eq "4" ]
+	then
+	main_finctions
 fi
 }
 
@@ -129,19 +258,36 @@ if [ $MAIN_FUNC -eq "1" ]
 	then
 	compile_menu
 fi
+if [ $MAIN_FUNC -eq "2" ]
+	then
+	debug_menu
+fi
+if [ $MAIN_FUNC -eq "3" ]
+	then
+	flash_menu
+fi
 
 }
 
-compile_menu(){
-COMPILE_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
-"1" "Compile new kernel" \
-"2" "Re-compile kernel" \
-"3" "Clean out directory" \
-"4" "Back"  3>&1 1>&2 2>&3)
-
-if [ $COMPILE_MENU -eq "4" ]
+settigs_menu(){
+SETTINGS_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
+"1" "Download BS Boot-packer add-on manual " \
+"2" "Re-config script" \
+"3" "Back"  3>&1 1>&2 2>&3)
+if [ $SETTINGS_MENU -eq "3" ]
 	then
-	main_finctions
+	main_menu
+fi
+if [ $SETTINGS_MENU -eq "2" ]
+	then
+	rm -rf initialization.bsf
+	rm -rf $OUT_DIR/kernel
+	rm -rf $OUT_DIR/logs
+	config_script
+fi
+if [ $SETTINGS_MENU -eq "1" ]
+	then
+	download_packer
 fi
 }
 
@@ -171,4 +317,5 @@ if [ $MAIN_MENU -eq "4" ]
 	exit
 fi
 }
+#Script body
 main_menu
