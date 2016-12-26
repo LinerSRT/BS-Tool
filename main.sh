@@ -108,6 +108,7 @@ get_logcat(){
 	echo $LOGCAT >> logcat-$curdate.txt
 	 cd .. && cd ..
 	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
+	log_menu
 }
 get_dmesg(){
 	read DMESG < <(adb shell su -c dmesg)
@@ -115,6 +116,7 @@ get_dmesg(){
 	echo $DMESG >> dmesg-$curdate.txt
 	 cd .. && cd ..
 	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
+	log_menu
 }
 get_kmsg(){
 	read KMSG < <(adb shell su -c cat proc/kmsg)
@@ -122,6 +124,7 @@ get_kmsg(){
 	echo $KMSG >> kmsg-$curdate.txt
 	 cd .. && cd ..
 	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
+	log_menu
 }
 get_device_info(){
 	whiptail --title "BS Tool" --msgbox "Power on the phone and turn on debug mode in developer settings!" 10 60
@@ -310,6 +313,7 @@ fi
 if [ $MAIN_MENU -eq "3" ] 
 	then
 	whiptail --title "BS Tool" --msgbox "Created by SeriniTY(c). All rights reserved. Smart Rom Team" 7 64
+	main_menu
 fi
 if [ $MAIN_MENU -eq "4" ] 
 	then
