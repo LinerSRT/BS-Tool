@@ -132,12 +132,16 @@ get_device_info(){
 	read CPU_PHONE < <(adb shell cat proc/cpuinfo | grep -o "MT[0-9][0-9][0-9][0-9]")
 	read RAM_PHONE_KB < <(adb shell cat proc/meminfo | grep MemTotal | grep -o "[0-9]*")
 	read KERN_VER_PHONE < <(adb shell cat proc/version | grep -o "3\.[0-9]*\.[0-9]*")
+	read MANUFACTURER < <(adb shell cat system/build.prop | grep -oEi "manufacturer=[a-z]*")
 	echo "CPU_PHONE='$CPU_PHONE'" >> initialization.bsf
 	echo "RAM_PHONE_KB='$RAM_PHONE_KB'" >> initialization.bsf
 	echo "KERN_VER_PHONE='$KERN_VER_PHONE'" >> initialization.bsf
+	echo "MANUFACTURER='$MANUFACTURER'" >> initialization.bsf
 }
 #-----------------------MENU Construct----------------------------------
+remount_sys(){
 
+}
 log_menu(){
 LOG_MENU=$(whiptail --title  "BS Tool" --menu  "	" 10 60 4 \
 "1" "Get logcat" \
