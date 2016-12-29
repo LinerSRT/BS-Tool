@@ -7,7 +7,6 @@ if [ -z initialization.bsf ]
 	then
 	config_script
 fi
-	
 config_script(){
 if [ ! -f initialization.bsf ]
   then
@@ -55,6 +54,8 @@ if [ ! -f initialization.bsf ]
 	echo "KERN_IMG='$KERN_IMG'" >> initialization.bsf
 	echo "KERN_FOLDER='$OUT_DIR/kernel'" >> initialization.bsf
 	mkdir $OUT_DIR/logs
+	read SOURCE_PATH < <(pwd)
+	echo "SOURCE_PATH='$SOURCE_PATH'" >> initialization.bsf
 	
 	#Configuring script
 	ARCH=$(whiptail --title "BS Tool" --inputbox "Set ARCH" 10 60 3>&1 1>&2 2>&3)
@@ -108,6 +109,13 @@ if [ ! -f initialization.bsf ]
 	else
 		echo "TOOL_FOLDER='no'" >> initialization.bsf
 	fi
+
+	if(whiptail --title  "BS Tool" --yesno  "Use zImage-dtb instead zImage?" 10 60)
+	then
+		echo "USE_DTB='yes'" >> initialization.bsf
+	else
+		echo "USE_DTB='no'" >> initialization.bsf
+	fi
  fi
 main_menu
 }
@@ -129,7 +137,7 @@ get_logcat(){
 	read LOGCAT < <(adb logcat)
 	cd $OUT_DIR/logs
 	echo $LOGCAT >> logcat-$curdate.txt
-	 cd .. && cd ..
+	 cd $SOURCE_PATH
 	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
 	log_menu
 }
@@ -137,7 +145,7 @@ get_dmesg(){
 	read DMESG < <(adb shell su -c dmesg)
 	cd $OUT_DIR/logs
 	echo $DMESG >> dmesg-$curdate.txt
-	 cd .. && cd ..
+	 cd $SOURCE_PATH
 	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
 	log_menu
 }
@@ -145,7 +153,7 @@ get_kmsg(){
 	read KMSG < <(adb shell su -c cat proc/kmsg)
 	cd $OUT_DIR/logs
 	echo $KMSG >> kmsg-$curdate.txt
-	 cd .. && cd ..
+	 cd $SOURCE_PATH
 	 whiptail --title "BS Tool" --msgbox "Log saved to $OUT_DIR/logs" 10 60
 	log_menu
 }
@@ -287,11 +295,89 @@ if [ "$CHKSV" -eq "4" ]
 	cd kernel
 	make TARGET_PRODUCT=$PROJECT_NAME clear
 	make TARGET_PRODUCT=$PROJECT_NAME mrproper
-	cd ..
+	cd $SOURCE_PATH
 	find -name '*.o' -delete;
 	else
 	make clean
 	find -name '*.o' -delete;
+fi
+}
+pack_img(){
+if [ $USE_BOOT_PACK = "yes" ]
+	then
+	mkdir $OUT_DIR/packer
+	mkdir $OUT_DIR/work_folder
+	if [ -e $OUT_DIR/tools/pack.exe ]
+		then
+		whiptail --title "BS Tool" --msgbox "Put *.img to repack in $OUT_DIR/packer"
+		cp $OUT_DIR/tools/pack.exe $OUT_DIR/work_folder/a.exe
+		read IMG < <( find *.img )
+		if [ -e $OUT_DIR/$IMG ]
+			then
+			cp $IMG $OUT_DIR/work_folder
+			cd $OUT_DIR/work_folder
+			wine pack.exe $IMG repack_img > /dev/null 2>&1
+			if [ "$CHKSV" -eq "4" ]
+				then
+				cd $SOURCE_PATH
+				cp $KERN_IMG $OUT_DIR/work_folder/repack_img/kernel
+				cp $IMG $OUT_DIR/work_folder
+				wine a.exe repack_img packed$curdate.img
+				cp $IMG $OUT_DIR/work_folder/packed$curdate.img $SOURCE_PATH/$OUT_DIR
+			else
+				cd $SOURCE_PATH
+				if [ $USE_DTB = "yes" ]
+					then
+					rm $OUT_DIR/work_folder/repack_img/kernel/zImage
+					cp $KERN_IMG $OUT_DIR/work_folder/repack_img/kernel
+					mv $OUT_DIR/work_folder/repack_img/kernel/zImage-dtb $OUT_DIR/work_folder/repack_img/kernel/zImage
+					else
+					cp $KERN_IMG $OUT_DIR/work_folder/repack_img/kernel
+				fi
+				cp $IMG $OUT_DIR/work_folder
+				wine a.exe repack_img packed$curdate.img
+				cp $IMG $OUT_DIR/work_folder/packed$curdate.img $SOURCE_PATH/$OUT_DIR
+			fi
+			else
+			whiptail --title "BS Tool" --msgbox "File *.img not found!"
+		fi
+		else
+		cd $SOURCE_PATH/$OUT_DIR/tools
+		wget https://www.dropbox.com/s/tu7jd8fxuvrdl9d/pack.exe > /dev/null 2>&1
+		sleep 1.5s
+		cd $SOURCE_PATH
+		read IMG < <( find *.img )
+		if [ -e $OUT_DIR/$IMG ]
+			then
+			cp $IMG $OUT_DIR/work_folder
+			cd $OUT_DIR/work_folder
+			wine pack.exe $IMG repack_img > /dev/null 2>&1
+			if [ "$CHKSV" -eq "4" ]
+				then
+				cd $SOURCE_PATH
+				cp $KERN_IMG $OUT_DIR/work_folder/repack_img/kernel
+				cp $IMG $OUT_DIR/work_folder
+				wine a.exe repack_img packed$curdate.img
+				cp $IMG $OUT_DIR/work_folder/packed$curdate.img $SOURCE_PATH/$OUT_DIR
+			else
+				cd $SOURCE_PATH
+				if [ $USE_DTB = "yes" ]
+					then
+					rm $OUT_DIR/work_folder/repack_img/kernel/zImage
+					cp $KERN_IMG $OUT_DIR/work_folder/repack_img/kernel
+					mv $OUT_DIR/work_folder/repack_img/kernel/zImage-dtb $OUT_DIR/work_folder/repack_img/kernel/zImage
+					else
+					cp $KERN_IMG $OUT_DIR/work_folder/repack_img/kernel
+				fi
+				cp $IMG $OUT_DIR/work_folder
+				wine a.exe repack_img packed$curdate.img
+				cp $IMG $OUT_DIR/work_folder/packed$curdate.img $SOURCE_PATH/$OUT_DIR
+			fi
+			else
+			whiptail --title "BS Tool" --msgbox "File *.img not found!"
+		fi
+	fi
+	whiptail --title "BS Tool" --msgbox "Reconfig script, cause $USE_BOOT_PACK "
 fi
 }
 #-----------------------MENU Construct----------------------------------
